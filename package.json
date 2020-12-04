@@ -10,7 +10,7 @@
 		"Other"
 	],
 	"activationEvents": [
-		"onCommand:vscode-odoo.helloWorld"
+        "onView:vscode-odoo-models"
 	],
 	"main": "./dist/extension.js",
 	"contributes": {
@@ -19,8 +19,36 @@
 				"command": "vscode-odoo.helloWorld",
 				"title": "Hello World"
 			}
-		]
-	},
+        ],
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "vscode-odoo-container",
+                    "title": "Odoo",
+                    "icon": "./static/img/odoo.png"
+                }
+            ]
+        },
+        "views": {
+            "vscode-odoo-container": [
+                {
+                    "id": "vscode-odoo-models",
+                    "name": "Models"
+                }
+            ]
+        },
+        "configuration": {
+            "type": "object",
+            "title": "Odoo",
+            "properties": {
+                "vscode-odoo.addons_path": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Comma-separated list with addon filepaths."
+                }
+            }
+        }
+    },
 	"scripts": {
 		"vscode:prepublish": "npm run package",
 		"compile": "webpack --devtool nosources-source-map --config ./build/node-extension.webpack.config.js",
