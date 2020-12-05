@@ -2,7 +2,7 @@
 	"name": "vscode-odoo",
 	"displayName": "vscode-odoo",
 	"description": "",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"engines": {
 		"vscode": "^1.51.0"
 	},
@@ -18,7 +18,14 @@
 			{
 				"command": "vscode-odoo.helloWorld",
 				"title": "Hello World"
-			}
+            }, {
+                "command": "vscode-odoo.update-models",
+                "title": "Update",
+                "icon": {
+                    "light": "static/img/refresh_light.svg",
+                    "dark": "static/img/refresh_dark.svg"
+                }
+            }
         ],
         "viewsContainers": {
             "activitybar": [
@@ -34,6 +41,15 @@
                 {
                     "id": "vscode-odoo-models",
                     "name": "Models"
+                }
+            ]
+        },
+        "menus": {
+            "view/title": [
+                {
+                    "command": "vscode-odoo.update-models",
+                    "when": "view == 'vscode-odoo-models'",
+                    "group": "navigation"
                 }
             ]
         },

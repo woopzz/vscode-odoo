@@ -14,20 +14,27 @@ export class ModelProvider implements vscode.TreeDataProvider<ModelTreeItem> {
 
     refresh(): void {
         const self = this;
+        const doOnExit = function () {
+            self._onDidChangeTreeData.fire();
+        }
+
+        self.data = {};
 
         const config = vscode.workspace.getConfiguration('vscode-odoo');
         const addons_path = <string>config.get('addons_path');
-        if (!addons_path) return;
+        if (!addons_path) {
+            doOnExit();
+            return;
+        }
 
         const cmd = `egrep -Rn "${self.regex.toString().slice(1, -1)}" ${addons_path.split(',').join(' ')}`;
         child_process.exec(cmd, {maxBuffer: 200000000}, function(err, stdout, stderr) {
             if (!stdout) {
                 vscode.window.showWarningMessage('No Odoo models found!');
                 if (err) console.error(`egrep error with code ${err.code || '(unset)'}.`);
+                doOnExit();
                 return;
             }
-
-            self.data = {};
 
             let fpath, lineNo, dirtyModelName, match, modelName;
             stdout.split('\n').forEach(function (line) {
@@ -46,7 +53,7 @@ export class ModelProvider implements vscode.TreeDataProvider<ModelTreeItem> {
                 }
             });
 
-            self._onDidChangeTreeData.fire();
+            doOnExit();
         });
     }
 
