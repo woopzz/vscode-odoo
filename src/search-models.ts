@@ -197,14 +197,10 @@ export class SearchModelsViewProvider implements vscode.WebviewViewProvider {
                         const vscode = acquireVsCodeApi();
                         document.addEventListener('click', (e) => {
                             const target = e.target;
-                            if (target.id === 'strict-search-button') {
+                            if (target.id === 'strict-search-button' || target.id === 'nonstrict-search-button') {
+                                const command = target.id === 'strict-search-button' ? 'strictSearch' : 'nonstrictSearch';
                                 vscode.postMessage({
-                                    command: 'strictSearch',
-                                    text: document.getElementById('search-input').value,
-                                });
-                            } else if (target.id === 'nonstrict-search-button') {
-                                vscode.postMessage({
-                                    command: 'nonstrictSearch',
+                                    command: command,
                                     text: document.getElementById('search-input').value,
                                 });
                             } else if (target.classList.contains('search-list-item')) {
