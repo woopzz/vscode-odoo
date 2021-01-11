@@ -116,6 +116,10 @@ export class SearchModelsViewProvider implements vscode.WebviewViewProvider {
         switch (payload.command) {
             case 'strictSearch':
             case 'nonstrictSearch': {
+                // To ensure that the search begun,
+                // it's useful because a pause to get results may be very long.
+                vscode.window.showInformationMessage('Searching Odoo models ...');
+
                 const strictSearch = payload.command === 'strictSearch';
                 this._state.updateBySearchString(payload.text, this.repaint.bind(this), strictSearch)
                 .then(() => this.repaint())
