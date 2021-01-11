@@ -30,42 +30,52 @@ class State {
         this._searchString = '';
     }
 
-    public updateBySearchString(text: string, callback: null | Function) {
+    public updateBySearchString(text: string, callback: null | Function, strictSearch: boolean) {
         const self = this;
         self._reset();
-        self._searchString = text;
-        if (!text) return;
 
-        const config = vscode.workspace.getConfiguration('vscode-odoo');
-        const addons_path = <string>config.get('addons_path');
-        if (!addons_path) {
-            vscode.window.showErrorMessage('Invalid addons path!');
-            return;
-        }
-        const addons_path_list = addons_path.split(',');
+        return new Promise(function (resolve, reject) {
+            self._searchString = text;
+            if (!text) {
+                resolve(null);
+                return;
+            }
 
-        const regex = new RegExp(`^\\s*_(name|inherit) *= *[\\'\\"].*${text}.*[\\'\\"]\\s*$`);
-        const cmd = `egrep -Rn "${regex.toString().slice(1, -1)}" ${addons_path_list.join(' ')}`;
-        child_process.exec(cmd, {maxBuffer: 200000000}, function(err, stdout, stderr) {
-            if (!stdout) return;
+            const config = vscode.workspace.getConfiguration('vscode-odoo');
+            const addons_path = <string>config.get('addons_path');
+            if (!addons_path) {
+                reject('Invalid addons path!');
+                return;
+            }
+            const addons_path_list = addons_path.split(',');
 
-            stdout.split('\n').forEach(function (line) {
-                if (!line || !line.length) return;
+            const regex_text = strictSearch ? text : `.*${text}.*`;
+            const regex = new RegExp(`^\\s*_(name|inherit) *= *[\\'\\"]${regex_text}[\\'\\"]\\s*$`);
+            const cmd = `egrep -Rn "${regex.toString().slice(1, -1)}" ${addons_path_list.join(' ')}`;
+            child_process.exec(cmd, {maxBuffer: 200000000}, function(err, stdout, stderr) {
+                if (!stdout) {
+                    resolve(null);
+                    return;
+                }
 
-                const [fpath, lineNo, dirtyModelName] = line.split(':');
+                stdout.split('\n').forEach(function (line) {
+                    if (!line || !line.length) return;
 
-                let label = fpath;
-                for (let i = 0; i < addons_path_list.length; i++)
-                    if (fpath.startsWith(addons_path_list[i])) {
-                        label = fpath.slice(addons_path_list[i].length);
-                        break;
-                    }
+                    const [fpath, lineNo, dirtyModelName] = line.split(':');
 
-                const item = new SearchListItem(label, fpath, parseInt(lineNo));
-                self._searchListItems.push(item);
+                    let label = fpath;
+                    for (let i = 0; i < addons_path_list.length; i++)
+                        if (fpath.startsWith(addons_path_list[i])) {
+                            label = fpath.slice(addons_path_list[i].length);
+                            break;
+                        }
+
+                    const item = new SearchListItem(label, fpath, parseInt(lineNo));
+                    self._searchListItems.push(item);
+                });
+
+                resolve(null);
             });
-
-            if (callback) callback();
         });
     }
 }
@@ -104,8 +114,12 @@ export class SearchModelsViewProvider implements vscode.WebviewViewProvider {
 
     private _manageMessage(payload: any) {
         switch (payload.command) {
-            case 'search': {
-                this._state.updateBySearchString(payload.text, this.repaint.bind(this));
+            case 'strictSearch':
+            case 'nonstrictSearch': {
+                const strictSearch = payload.command === 'strictSearch';
+                this._state.updateBySearchString(payload.text, this.repaint.bind(this), strictSearch)
+                .then(() => this.repaint())
+                .catch(msg => vscode.window.showErrorMessage(msg));
                 break;
             }
             case 'openFile': {
@@ -131,14 +145,38 @@ export class SearchModelsViewProvider implements vscode.WebviewViewProvider {
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Odoo Models</title>
                 <style>
+                    #search-control {
+                        display: flex;
+                        width: 100%;
+                    }
+                    #search-control > * {
+                        margin: 0 2px;
+                        padding: 5px;
+                        color: rgb(204, 204, 204);
+                        background-color: rgb(66, 66, 66);
+                        border: none;
+                    }
+                    #search-input {
+                        min-width: 50px;
+                        flex-grow: 2;
+                        outline-color: #007fd4;
+                    }
+                    #strict-search-button, #nonstrict-search-button {
+                        min-width: 40px;
+                        cursor: pointer;
+                    }
+                    #strict-search-button:focus, #nonstrict-search-button:focus {
+                        outline: 1px solid #007fd4;
+                        outline-offset: -1px;
+                    }
                     .search-list {
                         padding: 0;
                         margin: 0;
                         list-style-type: none;
                     }
                     .search-list-item {
-                        cursor: pointer;
                         padding: 0.5em 0;
+                        cursor: pointer;
                     }
                     .search-list-item:hover {
                         color: red;
@@ -146,8 +184,11 @@ export class SearchModelsViewProvider implements vscode.WebviewViewProvider {
                 </style>
             </head>
             <body>
-                <input id="search-input" value="${this._state.searchString}"/>
-                <button id="search-button">Search</button>
+                <div id="search-control">
+                    <input id="search-input" value="${this._state.searchString}"/>
+                    <button id="strict-search-button">S</button>
+                    <button id="nonstrict-search-button">NS</button>
+                </div>
                 <ul class="search-list">
                     ${this._state.searchListItems.map((el, index) => `<li class="search-list-item" index="${index}">${el.label}</li>`).join('')}
                 </ul>
@@ -156,9 +197,14 @@ export class SearchModelsViewProvider implements vscode.WebviewViewProvider {
                         const vscode = acquireVsCodeApi();
                         document.addEventListener('click', (e) => {
                             const target = e.target;
-                            if (target.id === 'search-button') {
+                            if (target.id === 'strict-search-button') {
                                 vscode.postMessage({
-                                    command: 'search',
+                                    command: 'strictSearch',
+                                    text: document.getElementById('search-input').value,
+                                });
+                            } else if (target.id === 'nonstrict-search-button') {
+                                vscode.postMessage({
+                                    command: 'nonstrictSearch',
                                     text: document.getElementById('search-input').value,
                                 });
                             } else if (target.classList.contains('search-list-item')) {
